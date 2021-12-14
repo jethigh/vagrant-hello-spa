@@ -1,0 +1,21 @@
+---
+- hosts: all
+  become: true
+  tasks:
+  - name: Initialize the Kubernetes cluster using kubeadm
+    block:
+      - name: Check status
+        shell: /usr/local/bin/kubectl cluster-info
+        environment:
+          KUBECONFIG: "/etc/kubernetes/admin.conf"
+    rescue:
+      - name: Copy the join command to server location
+        copy: src=join-command dest=/tmp/join-command.sh mode=0777
+
+      - name: Join the node to cluster
+        command: sh /tmp/join-command.sh
+        environment:
+          PATH: "{{ ansible_env.PATH }}:/usr/local/bin/"
+      - name: Copy kubernetes config
+        shell: mkdir -p /home/vagrant/.kube && mkdir -p /etc/kubernetes && cp /vagrant/kubernetes-setup/admin.conf /home/vagrant/.kube/config && cp /vagrant/kubernetes-setup/admin.conf /etc/kubernetes/admin.conf && chown vagrant:vagrant /home/vagrant/.kube/config
+

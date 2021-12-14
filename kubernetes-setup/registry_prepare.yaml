@@ -1,0 +1,64 @@
+- hosts: all
+  tasks:
+    - name: Install python-docker
+      ansible.builtin.package:
+        name: python-docker
+        state: present
+      register: out
+    - debug: var=out
+
+    - name: install community.docker plugin
+      ansible.builtin.shell: ansible-galaxy collection install community.docker -p /usr/share/ansible/collections/
+      register: out
+    - debug: var=out
+
+    - name: Create certs directory
+      ansible.builtin.file:
+        path: /app/certs
+        state: directory
+        mode: '0755'
+      register: out
+    - debug: var=out
+
+    - name: Create registry certificate config file
+      ansible.builtin.copy:
+        dest: /app/certs/registry.cnf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [ req ]
+          default_bits       = 4096
+          distinguished_name = req_distinguished_name
+          req_extensions     = req_ext
+          [ req_distinguished_name ]
+          countryName                 = Country Name (2 letter code)
+          countryName_default         = PL
+          stateOrProvinceName         = State or Province Name (full name)
+          stateOrProvinceName_default = wielkopolskie
+          localityName                = Locality Name (eg, city)
+          localityName_default        = Poznan
+          organizationName            = Organization Name (eg, company)
+          organizationName_default    = Santander Bank Polska S.A.
+          organizationalUnitName          = Organizational Unit Name (eg, section)
+          organizationalUnitName_default    = home_worker
+          commonName                  = common name
+          commonName_default                  = registry
+          emailAddress                = Email Address
+          emailAddress_default            = jethigh@gmail.com
+          [ req_ext ]
+          subjectAltName = @alt_names
+          [alt_names]
+          DNS.1   = registry
+          IP.1    = 192.168.50.90
+    
+    - name: Create registry certificates
+      ansible.builtin.shell: openssl req -newkey rsa:4096 -nodes -sha256 -keyout /app/certs/registry.key -x509 -days 365 -config /app/certs/registry.cnf -out /app/certs/registry.crt -extensions req_ext -batch
+      register: out
+    - debug: var=out
+
+    - name: Copu registry certificate to synced folder
+      ansible.builtin.shell: cp /app/certs/registry.crt /vagrant/kubernetes-setup/
+      register: out
+    - debug: var=out
+

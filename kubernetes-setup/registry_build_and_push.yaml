@@ -1,0 +1,21 @@
+- hosts: all
+  tasks:
+    - name: Build docker image
+      community.docker.docker_image:
+        name: registry:5000/hello-spa
+        push: yes
+        build:
+          dockerfile: /vagrant/docker/Dockerfile
+          path: /vagrant/
+        source: build
+      register: out
+    - debug: var=out
+
+    - name: Archive image
+      community.docker.docker_image:
+        name: registry:5000/hello-spa
+        tag: latest
+        archive_path: /vagrant/docker/hello-spa.tar
+        source: local
+      register: out
+    - debug: var=out

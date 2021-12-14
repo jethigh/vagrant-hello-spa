@@ -1,0 +1,123 @@
+---
+- hosts: all
+  become: true
+  tasks:
+  - name: Change Docker cgroup driver
+    copy:
+      dest: /etc/docker/daemon.json
+      content: |
+        {
+          "exec-opts": ["native.cgroupdriver=systemd"]
+        }
+    register: daemon
+
+  - name: Add registry host to /etc/hosts
+    lineinfile:
+      path: /etc/hosts
+      line: "192.168.50.90 registry"
+      create: yes
+
+  - name: Create registry certificates direcotry
+    file:
+      path: /etc/docker/certs.d/registry:5000
+      state: directory
+      mode: '0755'
+    register: out
+  - debug: var=out
+
+  - name: Add registry certificate
+    copy:
+      src: /vagrant/kubernetes-setup/registry.crt
+      dest: /etc/docker/certs.d/registry:5000
+      owner: root
+      group: root
+      mode: '0644'
+    register: out
+  - debug: var=out
+
+  - name: Restart Docker service
+    service:
+      name: docker.service
+      state: restarted
+    when: daemon.changed
+
+  - name: Disable firewalld
+    service:
+      name: firewalld.service
+      state: stopped
+
+  - name: Add /usr/local/bin to root PATH
+    lineinfile:
+      path: /root/.bashrc
+      line: "{{ item }}"
+      create: yes
+    with_items:
+      - export KUBECONFIG=/etc/kubernetes/admin.conf
+      - export PATH=/usr/local/bin:$PATH
+    register: out
+  - debug: var=out
+
+  - name: Configure node ip
+    lineinfile:
+      path: /etc/default/kubelet
+      line: KUBELET_EXTRA_ARGS=--node-ip={{ node_ip }}
+      create: yes
+
+  - name: Install conntrack and socat
+    package:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - conntrack
+      - socat
+    register: out
+  - debug: var=out
+
+  - name: Remove swapfile from /etc/fstab
+    mount:
+      name: "{{ item }}"
+      fstype: swap
+      state: absent
+    with_items:
+      - swap
+      - none
+
+  - name: Disable swap
+    command: swapoff -a
+    when: ansible_swaptotal_mb > 0
+
+  - name: Create directory for CNI
+    file: 
+      path: /opt/cni/bin
+      state: directory
+
+  - name: Download command files for CNI
+    shell: curl -L "https://github.com/containernetworking/plugins/releases/download/{{ CNI_VERSION }}/cni-plugins-linux-{{ ARCH }}-{{ CNI_VERSION }}.tgz" | sudo tar -C /opt/cni/bin -xz
+
+  - name: Create directory for crictl
+    file: 
+      path: /usr/local/bin
+      state: directory
+
+  - name: Install crictl
+    shell: curl -L "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ CRICTL_VERSION }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz" | sudo tar -C /usr/local/bin -xz
+
+  - name: Install kubeadm, kubelet, kubectl
+    shell: cd /usr/local/bin && curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/{{ RELEASE }}/bin/linux/{{ ARCH }}/{kubeadm,kubelet,kubectl} && sudo chmod +x {kubeadm,kubelet,kubectl}
+
+  - name: Create kubelet unit file directory
+    file:
+      path: /etc/systemd/system/kubelet.service.d
+      state: directory
+
+  - name: Create systemd unit files for kubelet
+    shell: curl -sSL "https://raw.githubusercontent.com/kubernetes/release/{{ UNIT_VERSION }}/cmd/kubepkg/templates/latest/deb/kubelet/lib/systemd/system/kubelet.service" | sed "s:/usr/bin:/usr/local/bin:g" | sudo tee /etc/systemd/system/kubelet.service
+
+  - name: Create kubeadm.conf
+    shell: curl -sSL "https://raw.githubusercontent.com/kubernetes/release/{{ UNIT_VERSION }}/cmd/kubepkg/templates/latest/deb/kubeadm/10-kubeadm.conf" | sed "s:/usr/bin:/usr/local/bin:g" | sudo tee /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+  - name: Start kubelet service
+    service:
+      name: kubelet
+      state: started
+      enabled: yes
