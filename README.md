@@ -59,12 +59,16 @@ Enter folder hello-spa:
 Bring up and provision virtual machines:  
 `vagrant up`  
 
-Visit address http://127.0.0.1:8080/ in Your favorite web browser.
+Visit address http://127.0.0.1:8080/ in Your favorite web browser.  
+(change the port number to the correct one if you changed the value of the HOST_APP_PORT variable)
 
 #### Customization:  
 
 ###### Port forwarding
 The port shared on the host machine can be changed by editing the `HOST_APP_PORT` value in the Vagrantfile  
+
+###### VM's resources
+VM's resources can be modified by replacing the corresponding values: `HELLOSPA_CPU`, `HELLOSPA_MEM`, `REGISTRY_CPU`, `REGISTRY_MEM` in Vagrantfile.  
 
 ###### Virtual machines IP addresses
 Addresses of virtual machines in the private network can be set by changing the value of the `HELLOSPA_IP` and `REGISTRY_IP` variables in Vagrantfile   

@@ -2,9 +2,15 @@
 # vi: set ft=ruby :
 
 # User customization
-HELLOSPA_IP = "192.168.201.10"
-REGISTRY_IP = "192.168.201.12"
-HOST_APP_PORT = 9080
+HELLOSPA_IP = "192.168.200.10"
+HELLOSPA_CPU = 2
+HELLOSPA_MEM = 2048
+
+REGISTRY_IP = "192.168.200.11"
+REGISTRY_CPU = 2
+REGISTRY_MEM = 2048
+
+HOST_APP_PORT = 8080
 # End
 
 Vagrant.configure("2") do |config|
@@ -16,6 +22,10 @@ Vagrant.configure("2") do |config|
       create: true, owner: "vagrant", group: "vagrant"
     registry.vm.synced_folder "./playbooks", "/vagrant/playbooks"
     registry.vm.network "private_network", ip: REGISTRY_IP
+    registry.vm.provider :virtualbox do |vb|
+        vb.memory = REGISTRY_MEM
+        vb.cpus = REGISTRY_CPU
+    end
     registry.vm.provision "ansible_local" do |ansible|
       ansible.playbook = "playbooks/registry_prepare.yaml"
       ansible.become = true
@@ -37,6 +47,10 @@ Vagrant.configure("2") do |config|
     hellospa.vm.synced_folder "./playbooks", "/vagrant/playbooks"
     hellospa.vm.network "private_network", ip: HELLOSPA_IP
     hellospa.vm.network "forwarded_port", guest: 80, host: HOST_APP_PORT, id: "hellospa"
+    hellospa.vm.provider :virtualbox do |vb|
+        vb.memory = HELLOSPA_MEM
+        vb.cpus = HELLOSPA_CPU
+    end
     hellospa.vm.provision "ansible_local" do |ansible|
       ansible.playbook = "playbooks/hellospa.yaml"
       ansible.become = true
